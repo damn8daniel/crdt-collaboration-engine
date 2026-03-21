@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ownedDocuments Document[]         @relation("DocumentOwner")
+  permissions    DocumentPermission[]
+  snapshots      DocumentSnapshot[]
+
+  @@map("users")
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  title     String   @default("Untitled")
+  content   Bytes?   // Yjs binary state
+  language  String   @default("plaintext")
+  ownerId   String   @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner       User                 @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  permissions DocumentPermission[]
+  snapshots   DocumentSnapshot[]
+
+  @@index([ownerId])
+  @@map("documents")
+}
+
+enum Role {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+model DocumentPermission {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  userId     String   @map("user_id")
+  role       Role     @default(VIEWER)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@map("document_permissions")
+}
+
+model DocumentSnapshot {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  content    Bytes    // Yjs binary state at snapshot time
+  label      String?
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author   User     @relation(fields: [createdBy], references: [id])
+
+  @@index([documentId])
+  @@map("document_snapshots")
+}
